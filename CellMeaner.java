@@ -1,9 +1,5 @@
-import java.util.Arrays;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.Future;
-import java.util.concurrent.RecursiveTask;
-import java.util.HashMap;
+import java.util.*;
+import java.util.concurrent.*;
 
 public class CellMeaner extends RecursiveTask<HashMap<Integer,Integer>> {
 
@@ -23,8 +19,7 @@ public class CellMeaner extends RecursiveTask<HashMap<Integer,Integer>> {
     }
 
     @Override
-    protected HashMap<Integer,Integer> compute () {        
-        Float average = 0f;
+    protected HashMap<Integer,Integer> compute () {    
         HashMap<Integer,Integer> tally = new HashMap<Integer,Integer>();
 // This logic allows the program to downsample to resolutions that would otherwise render some dimensions zero locations long:
         int extent = DownSampler.dimensions[currentLevel];
@@ -32,52 +27,29 @@ public class CellMeaner extends RecursiveTask<HashMap<Integer,Integer>> {
         if (limitedExtent > extent) {
             limitedExtent = extent;
         }
-// If we're not yet at the highest dimension, we'll create child CellMeaners to survey them for us...     
+// If we're not yet at the highest dimension, we'll create child CellMeaners to survey them for us (or use their compute() methods with the current thread)...     
         if (currentLevel + 1 < DownSampler.depth) {  
             for (int i = 0; i < limitedExtent; ++i) {
                 int[] childCoordinate = Arrays.copyOf(startCorner, startCorner.length);
                 childCoordinate[currentLevel] += i;
+                CellMeaner childMeaner = new CellMeaner(childCoordinate, currentLevel + 1);
+                HashMap<Integer,Integer> sliceResults = new HashMap<Integer, Integer>();
                 if (workOneDimensionUp > 1024 && i != limitedExtent - 1 && DownSampler.staySynchronous == false) {
                     // System.out.println("Deploying CellMeaner to " + Arrays.toString(childCoordinate) + " at depth " + (dimension + 1));
-                    Future <HashMap<Integer,Integer>> floatFromChild = ForkJoinPool.commonPool().submit(new CellMeaner(childCoordinate, currentLevel + 1));
+                    Future <HashMap<Integer,Integer>> floatFromChild = ForkJoinPool.commonPool().submit(childMeaner);
                     DownSampler.MeanerThreadsStarted += 1;
 // If this is the wrong way to handle exceptions, I appologize; I just tried stuff until the warnings went away. Also I'm new to lamdas.
                     try {                        
-                        HashMap<Integer,Integer> gotten = floatFromChild.get();
-                        gotten.forEach((key, value) -> {
-                            if (tally.containsKey(key)) {
-                                tally.put(key, value + tally.get(key));
-                            } 
-                            else {
-                                tally.put(key, value);
-                            }
-                        });
+                        sliceResults = floatFromChild.get();
                     }
                     catch (InterruptedException e) {}
                     catch (ExecutionException e) {}
                 }
                 else {
                     // System.out.println("Doing it myself: " + Arrays.toString(childCoordinate) + " at depth " + (dimension + 1));
-// compute() can't have any parameters, so if we want to keep working on this thread, we need to store the current state of the instance for when the recursion completes.
-// I'm assuming this is preferable to creating a new CornerSeeker, but I could be wrong.
-                    int comeBackToDepth = currentLevel;
-                    int[] comeBackToCoordinate = startCorner;
-                    currentLevel = currentLevel + 1;
-                    startCorner = childCoordinate;
-                    SetWorkOneLevelAbove();
-                    HashMap<Integer,Integer> gotten = compute();
-                    gotten.forEach((key, value) -> {
-                        if (tally.containsKey(key)) {
-                            tally.put(key, value + tally.get(key));
-                        } 
-                        else {
-                            tally.put(key, value);
-                        }
-                    });
-                    currentLevel = comeBackToDepth;
-                    startCorner = comeBackToCoordinate;
-                    SetWorkOneLevelAbove();
+                    sliceResults = childMeaner.compute();                    
                 }
+                incorporateResults(sliceResults, tally);
             }
         }
 // ...otherwise, this is an instance that has to do some counting!
@@ -110,6 +82,19 @@ public class CellMeaner extends RecursiveTask<HashMap<Integer,Integer>> {
                 limitedExtent = extent;
             } 
             workOneDimensionUp = limitedExtent;
+        }
+    }
+
+    void incorporateResults (HashMap<Integer,Integer> input, HashMap<Integer,Integer> output) {
+        for (Map.Entry<Integer, Integer> pair: input.entrySet()) {
+            int key = pair.getKey();
+            int value = pair.getValue();
+            if (output.containsKey(key)) {
+                output.put(key, value + output.get(key));
+            } 
+            else {
+                output.put(key, value);
+            }
         }
     }
 

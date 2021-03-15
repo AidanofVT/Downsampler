@@ -37,8 +37,8 @@ class DownSampler {
 // The factor by which input is to be downsampled. Should be a power of 2!
     public static int samplingFactor = 2;
     public static boolean staySynchronous = false;
-    public static int MeanerThreadsStarted = 0;
-    public static int SeekerThreadsStarted = 1;
+    public static int MeanerThreadsStarted;
+    public static int SeekerThreadsStarted;
 
     public static void main (String[] args) {
         System.out.println("Start.");
@@ -51,9 +51,11 @@ class DownSampler {
             CreateReceptacle();
             int[] originPoint = new int[depth];
             PopulateInputRandomly(originPoint, 0);
-            long startTime = System.currentTimeMillis();
+            MeanerThreadsStarted = 0;
+            SeekerThreadsStarted = 1;
             staySynchronous = false;
-            ForkJoinPool.commonPool().execute(new CornerSeeker(originPoint, 0));
+            long startTime = System.currentTimeMillis();
+            ForkJoinPool.commonPool().execute(new CornerSeeker(originPoint, 0, false));
             while (ForkJoinPool.commonPool().isQuiescent() == false) {
                 try {
                     Thread.sleep(15);
@@ -63,9 +65,10 @@ class DownSampler {
             System.out.println("     Multithreaded attempt finished after " + (System.currentTimeMillis() - startTime) + "ms of downSampling, involving " + MeanerThreadsStarted + " meaner threads and " + SeekerThreadsStarted + " cornering threads.");
             MeanerThreadsStarted = 0;
             SeekerThreadsStarted = 1;
-            startTime = System.currentTimeMillis();
             staySynchronous = true;
-            ForkJoinPool.commonPool().execute(new CornerSeeker(originPoint, 0));
+            CreateReceptacle();
+            startTime = System.currentTimeMillis();
+            ForkJoinPool.commonPool().execute(new CornerSeeker(originPoint, 0, false));
             while (ForkJoinPool.commonPool().isQuiescent() == false) {
                 try {
                     Thread.sleep(15);
