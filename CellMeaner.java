@@ -32,12 +32,12 @@ public class CellMeaner extends RecursiveTask<HashMap<Integer,Integer>> {
         if (limitedExtent > extent) {
             limitedExtent = extent;
         }
-// If we're not yet at the highest dimension, we'll create child Cellmeaners to survey them for us...     
+// If we're not yet at the highest dimension, we'll create child CellMeaners to survey them for us...     
         if (currentLevel + 1 < DownSampler.depth) {  
             for (int i = 0; i < limitedExtent; ++i) {
                 int[] childCoordinate = Arrays.copyOf(startCorner, startCorner.length);
                 childCoordinate[currentLevel] += i;
-                if (workOneDimensionUp > 1024 && i != limitedExtent - 1) {
+                if (workOneDimensionUp > 1024 && i != limitedExtent - 1 && DownSampler.staySynchronous == false) {
                     // System.out.println("Deploying CellMeaner to " + Arrays.toString(childCoordinate) + " at depth " + (dimension + 1));
                     Future <HashMap<Integer,Integer>> floatFromChild = ForkJoinPool.commonPool().submit(new CellMeaner(childCoordinate, currentLevel + 1));
                     DownSampler.MeanerThreadsStarted += 1;
@@ -98,7 +98,7 @@ public class CellMeaner extends RecursiveTask<HashMap<Integer,Integer>> {
     }
 
     void SetWorkOneLevelAbove () {
-// If we're not at thi highest dimension, we'll refer to DownSampler's table of location-counts.
+// If we're not at the highest dimension, we'll refer to DownSampler's table of location-counts.
         if (currentLevel + 1 < DownSampler.depth) {
             workOneDimensionUp = DownSampler.locationsByTheSlice[currentLevel + 1];
         }
