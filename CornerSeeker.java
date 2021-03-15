@@ -30,7 +30,7 @@ public class CornerSeeker extends RecursiveAction {
                 int [] childCoordinate = Arrays.copyOf(parentCoordinate, parentCoordinate.length);
                 childCoordinate[currentLevel] = i;
 // This is the decision to fork or do some higher-dimension work on this thread:            
-                if (workOneDimensionUp > 32 && i < extent - DownSampler.samplingFactor) {                    
+                if (workOneDimensionUp > 32 && i < extent - DownSampler.samplingFactor && DownSampler.staySynchronous == false) {                    
                     // System.out.println("Deploying Solver to " + Arrays.toString(childCoordinate) + " at depth " + (dimension + 1));
                     ForkJoinPool.commonPool().execute(new CornerSeeker (childCoordinate, currentLevel + 1));
                     DownSampler.SeekerThreadsStarted += 1;
@@ -58,7 +58,7 @@ public class CornerSeeker extends RecursiveAction {
             float returned = -1;
             CellMeaner meaner = new CellMeaner(parentCoordinate, 0);
 // Another fork-or-not-to-fork decision. If this is the wrong way to handle exceptions, I appologize; I just tried stuff until the warnings went away.
-            if (DownSampler.locationsByTheSlice[0] > 256){
+            if (DownSampler.locationsByTheSlice[0] > 256 && DownSampler.staySynchronous == false){
                 try {
                     Future <Float> resultingFloat = ForkJoinPool.commonPool().submit(meaner);
                     DownSampler.MeanerThreadsStarted += 1;

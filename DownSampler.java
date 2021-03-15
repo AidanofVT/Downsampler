@@ -36,6 +36,7 @@ class DownSampler {
     public static int [] locationsByTheSlice;
 // The factor by which input is to be downsampled. Should be a power of 2!
     public static int samplingFactor = 2;
+    public static boolean staySynchronous;
     public static int MeanerThreadsStarted = 0;
     public static int SeekerThreadsStarted = 1;
 
@@ -51,6 +52,7 @@ class DownSampler {
             int[] originPoint = new int[depth];
             PopulateInputRandomly(originPoint, 0);
             long startTime = System.currentTimeMillis();
+            staySynchronous = false;
             ForkJoinPool.commonPool().execute(new CornerSeeker(originPoint, 0));
             while (ForkJoinPool.commonPool().isQuiescent() == false) {
                 try {
@@ -62,7 +64,14 @@ class DownSampler {
             MeanerThreadsStarted = 0;
             SeekerThreadsStarted = 1;
             startTime = System.currentTimeMillis();
-            SynchronousCornerSeeker(originPoint, 0);
+            staySynchronous = true;
+            ForkJoinPool.commonPool().execute(new CornerSeeker(originPoint, 0));
+            while (ForkJoinPool.commonPool().isQuiescent() == false) {
+                try {
+                    Thread.sleep(15);
+                }
+                catch (InterruptedException e) {}
+            }
             System.out.println("     Single-threaded attempt finished after " + (System.currentTimeMillis() - startTime) + "ms of downSampling.");
         }        
     }

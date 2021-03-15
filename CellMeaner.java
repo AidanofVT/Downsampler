@@ -35,7 +35,7 @@ public class CellMeaner extends RecursiveTask<Float> {
             for (int i = 0; i < limitedExtent; ++i) {
                 int[] childCoordinate = Arrays.copyOf(startCorner, startCorner.length);
                 childCoordinate[currentLevel] += i;
-                if (workOneDimensionUp > 1024 && i != limitedExtent - 1) {
+                if (workOneDimensionUp > 1024 && i != limitedExtent - 1 && DownSampler.staySynchronous == false) {
                     // System.out.println("Deploying CellMeaner to " + Arrays.toString(childCoordinate) + " at depth " + (dimension + 1));
                     Future <Float> floatFromChild = ForkJoinPool.commonPool().submit(new CellMeaner(childCoordinate, currentLevel + 1));
                     DownSampler.MeanerThreadsStarted += 1;
