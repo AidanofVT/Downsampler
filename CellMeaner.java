@@ -3,8 +3,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.Future;
 import java.util.concurrent.RecursiveTask;
+import java.util.HashMap;
 
-public class CellMeaner extends RecursiveTask<Float> {
+public class CellMeaner extends RecursiveTask<HashMap<Integer,Integer>> {
 
 // startCorner should be the coordinate of this CellMeaner at the next lowest dimension.
 // In other words, CellMeaner starts at {startCoordinate},0 with the trailing zero being the position in currentLevel, which will be incremented.
@@ -22,8 +23,9 @@ public class CellMeaner extends RecursiveTask<Float> {
     }
 
     @Override
-    protected Float compute () {        
+    protected HashMap<Integer,Integer> compute () {        
         Float average = 0f;
+        HashMap<Integer,Integer> tally = new HashMap<Integer,Integer>();
 // This logic allows the program to downsample to resolutions that would otherwise render some dimensions zero locations long:
         int extent = DownSampler.dimensions[currentLevel];
         int limitedExtent = DownSampler.samplingFactor;
@@ -37,11 +39,19 @@ public class CellMeaner extends RecursiveTask<Float> {
                 childCoordinate[currentLevel] += i;
                 if (workOneDimensionUp > 1024 && i != limitedExtent - 1) {
                     // System.out.println("Deploying CellMeaner to " + Arrays.toString(childCoordinate) + " at depth " + (dimension + 1));
-                    Future <Float> floatFromChild = ForkJoinPool.commonPool().submit(new CellMeaner(childCoordinate, currentLevel + 1));
+                    Future <HashMap<Integer,Integer>> floatFromChild = ForkJoinPool.commonPool().submit(new CellMeaner(childCoordinate, currentLevel + 1));
                     DownSampler.MeanerThreadsStarted += 1;
-// If this is the wrong way to handle exceptions, I appologize; I just tried stuff until the warnings went away.
+// If this is the wrong way to handle exceptions, I appologize; I just tried stuff until the warnings went away. Also I'm new to lamdas.
                     try {                        
-                        average += floatFromChild.get();
+                        HashMap<Integer,Integer> gotten = floatFromChild.get();
+                        gotten.forEach((key, value) -> {
+                            if (tally.containsKey(key)) {
+                                tally.put(key, value + tally.get(key));
+                            } 
+                            else {
+                                tally.put(key, value);
+                            }
+                        });
                     }
                     catch (InterruptedException e) {}
                     catch (ExecutionException e) {}
@@ -55,7 +65,15 @@ public class CellMeaner extends RecursiveTask<Float> {
                     currentLevel = currentLevel + 1;
                     startCorner = childCoordinate;
                     SetWorkOneLevelAbove();
-                    average += compute();
+                    HashMap<Integer,Integer> gotten = compute();
+                    gotten.forEach((key, value) -> {
+                        if (tally.containsKey(key)) {
+                            tally.put(key, value + tally.get(key));
+                        } 
+                        else {
+                            tally.put(key, value);
+                        }
+                    });
                     currentLevel = comeBackToDepth;
                     startCorner = comeBackToCoordinate;
                     SetWorkOneLevelAbove();
@@ -67,11 +85,16 @@ public class CellMeaner extends RecursiveTask<Float> {
             for (int i = 0; i < limitedExtent; ++i) {
                 int [] finalCoordinate = Arrays.copyOf(startCorner, startCorner.length);
                 finalCoordinate[currentLevel] += i;
-                average += DownSampler.ReferTo(DownSampler.input, finalCoordinate);
+                int intHere = DownSampler.ReferTo(DownSampler.input, finalCoordinate);
+                if (tally.containsKey(intHere)){
+                    tally.put(intHere, tally.get(intHere) + 1);
+                }
+                else {
+                    tally.put(intHere, 1);
+                }
             }
         }
-        average /= limitedExtent;
-        return average;
+        return tally;
     }
 
     void SetWorkOneLevelAbove () {

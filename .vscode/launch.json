@@ -17,12 +17,5 @@
             "request": "launch",
             "mainClass": "${file}"
         },
-        {
-            "type": "java",
-            "name": "Launch downSampler",
-            "request": "launch",
-            "mainClass": "downSampler",
-            "projectName": "javaLab_bd62e9af"
-        }
     ]
 }

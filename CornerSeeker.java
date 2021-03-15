@@ -3,6 +3,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RecursiveAction;
 import java.util.concurrent.ExecutionException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Set;
 import java.lang.Math;
 
 public class CornerSeeker extends RecursiveAction {
@@ -55,14 +57,14 @@ public class CornerSeeker extends RecursiveAction {
 // If the program gets here that means that parentCoordinate has all the digitsof a full coordinate, so it is truly the corner of a cell, and CellMeaner activity should start from here.
             // String pCoordEncoded = Arrays.toString(parentCoordinate);
             // System.out.println("Deploying CellMeaner to " + pCoordEncoded + " at depth " + 0);
-            float returned = -1;
+            HashMap<Integer,Integer> returned = new HashMap<Integer,Integer>();
             CellMeaner meaner = new CellMeaner(parentCoordinate, 0);
 // Another fork-or-not-to-fork decision. If this is the wrong way to handle exceptions, I appologize; I just tried stuff until the warnings went away.
             if (DownSampler.locationsByTheSlice[0] > 256){
                 try {
-                    Future <Float> resultingFloat = ForkJoinPool.commonPool().submit(meaner);
+                    Future <HashMap<Integer,Integer>> resultingMap = ForkJoinPool.commonPool().submit(meaner);
                     DownSampler.MeanerThreadsStarted += 1;
-                    returned = resultingFloat.get();
+                    returned = resultingMap.get();
                     // System.out.println(pCoordEncoded + " is a corner and it's average value is " + result);
                 }
                 catch (InterruptedException e) {}
@@ -71,12 +73,22 @@ public class CornerSeeker extends RecursiveAction {
             else {
                 returned = meaner.compute();
             }
-            int result = Math.round(returned);
+            Integer[] keys = returned.keySet().toArray(new Integer[returned.size()]);
+            int mostPopulous = 1;
+            int topPopularity = 0;
+            for (int i = 0; i < keys.length; ++i) {
+                int numInQuestion = keys[i];
+                int occurances = returned.get(numInQuestion);
+                if (occurances > topPopularity) {
+                    mostPopulous = numInQuestion;
+                    topPopularity = occurances;
+                }
+            }
             int [] scaledCoordinate = Arrays.copyOf(parentCoordinate, parentCoordinate.length);
             for (int i = 0; i < scaledCoordinate.length; ++i) {
                 scaledCoordinate[i] /= DownSampler.samplingFactor;
             }
-            DownSampler.ReferTo(DownSampler.output, scaledCoordinate, result);
+            DownSampler.ReferTo(DownSampler.output, scaledCoordinate, mostPopulous);
         }
     }
 
