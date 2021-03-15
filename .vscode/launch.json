@@ -6,6 +6,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "Launch DownSampler",
+            "request": "launch",
+            "mainClass": "DownSampler",
+            "projectName": "javaLab_bd62e9af"
+        },
+        {
+            "type": "java",
             "name": "Launch Current File",
             "request": "launch",
             "mainClass": "${file}"
