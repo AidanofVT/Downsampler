@@ -5,6 +5,13 @@ import java.util.concurrent.ForkJoinPool;
 
 class DownSampler {
 
+    // This is just here because I found it useful as a pattern to test whether the program was actually working. Remember to turn off PopulateInputRandomly()!
+    // static int [][] input = {
+    //     {0,0,1,1,0,0,1,1},
+    //     {0,0,1,1,1,1,0,0},
+    //     {0,0,1,1,0,0,1,1},
+    //     {0,0,1,1,1,1,0,0}
+    // };
     static Object [] tests = {
         new int [1000000],
         new int [1][1][1][1][1][1][1][1][1][1][1][1][1000000],
@@ -13,31 +20,24 @@ class DownSampler {
         new int [4][4][4][4][4][4][4][4][4][4]
     };
     static Object input;
-    // static int [][] input = {
-    //     {0,0,1,1,0,0,1,1},
-    //     {0,0,0,0,1,1,0,0},
-    //     {0,0,1,1,0,0,1,1},
-    //     {0,0,0,0,1,1,0,0}
-    // };
     static Object output;
 // These numbers specify the range of numbers that will fill the array if PopulateInputRandomly() is used.
-// Remember that in the upper bound is exclusive, so make this number one greater than you desire.
     static int minValue = 0;
     static int maxValue = 1;
 // The total count of dimensions.
     public static int depth;
-// The extents of teh dimensions.
+// The extents of the dimensions.
     public static int [] dimensions;
 // For each dimension, the amount of corners in that dimension and all higher dimensions. So, if input has three dimensions X,Y,Z, the first entry in this list would be all the
 // corners in the entire array, the second entry would be the number of corners with a single given X value, and the third entry would be the number of corners with a given X
-// and a given Y. Useful when itterating through a dimension, needing an estimate of how much work is contained in higher dimensions.
+// and a given Y. Useful when iterating through a dimension, needing an estimate of how much work is contained in higher dimensions.
     public static int [] cornersByTheSlice;
 // Similar to the above, but this contains a count of all points, rather than corners, that share {index} lower coordinates.
     public static int [] locationsByTheSlice;
 // The factor by which input is to be downsampled. Should be a power of 2!
     public static int samplingFactor = 2;
     public static boolean staySynchronous = false;
-    public static int MeanerThreadsStarted;
+    public static int ModerThreadsStarted;
     public static int SeekerThreadsStarted;
 
     public static void main (String[] args) {
@@ -51,7 +51,7 @@ class DownSampler {
             CreateReceptacle();
             int[] originPoint = new int[depth];
             PopulateInputRandomly(originPoint, 0);
-            MeanerThreadsStarted = 0;
+            ModerThreadsStarted = 0;
             SeekerThreadsStarted = 1;
             staySynchronous = false;
             long startTime = System.currentTimeMillis();
@@ -62,8 +62,8 @@ class DownSampler {
                 }
                 catch (InterruptedException e) {}
             }
-            System.out.println("     Multithreaded attempt finished after " + (System.currentTimeMillis() - startTime) + "ms of downSampling, involving " + MeanerThreadsStarted + " meaner threads and " + SeekerThreadsStarted + " cornering threads.");
-            MeanerThreadsStarted = 0;
+            System.out.println("     Multithreaded attempt finished after " + (System.currentTimeMillis() - startTime) + "ms of downSampling, involving " + ModerThreadsStarted + " moder threads and " + SeekerThreadsStarted + " cornering threads.");
+            ModerThreadsStarted = 0;
             SeekerThreadsStarted = 1;
             staySynchronous = true;
             CreateReceptacle();
@@ -100,7 +100,7 @@ class DownSampler {
         }
     }
 
-//Also populates CornersAndSuperordinateCornersPerDimension and SpotsPerCornerPerDimension
+//Also populates cornersByTheSlice and locationsByTheSlice
     static void FindDimensions () {
         dimensions = new int[depth];               
         Class<?> type;
@@ -213,54 +213,4 @@ class DownSampler {
         }
     }
 
-// Used as a reference for judging multithreaded perforamance:
-    static Float SynchronousCellMeaner (int[] startCorner, int dimension) {
-        Float average = 0f;
-        int extent = dimensions[dimension];
-        int limitedExtent = samplingFactor;
-        if (limitedExtent > extent) {
-            limitedExtent = extent;
-        }        
-        if (dimension + 1 < depth) {  
-            for (int i = 0; i < limitedExtent; ++i) {
-                int[] childCoordinate = Arrays.copyOf(startCorner, startCorner.length);
-                childCoordinate[dimension] += i;
-                // System.out.println("Deploying CellMeaner to " + Arrays.toString(childCoordinate) + " at depth " + (dimension + 1));
-                average += SynchronousCellMeaner(childCoordinate, dimension + 1);
-            }
-        }
-        else {
-            for (int i = 0; i < limitedExtent; ++i) {
-                int [] finalCoordinate = Arrays.copyOf(startCorner, startCorner.length);
-                finalCoordinate[dimension] += i;
-                average += ReferTo(input, finalCoordinate);
-            }
-        }
-        average /= limitedExtent;
-        return average;
-    } 
-
-// Used as a reference for judging multithreaded perforamance:
-    static void SynchronousCornerSeeker (int[] parentCoordinate, int dimension) {
-        if (dimension < depth) {
-            int extent = dimensions[dimension];
-            for (int i = 0; i < extent; i += samplingFactor) {
-                int [] childCoordinate = Arrays.copyOf(parentCoordinate, parentCoordinate.length);
-                childCoordinate[dimension] = i;
-                SynchronousCornerSeeker(childCoordinate, dimension + 1);
-            }
-        }
-        else {
-            // String pCoordEncoded = Arrays.toString(parentCoordinate);
-            // System.out.println("Deploying CellMeaner to " + pCoordEncoded + " at depth " + 0);
-            float returned = SynchronousCellMeaner(parentCoordinate, 0);
-            int result = Math.round(returned);
-            int [] scaledCoordinate = Arrays.copyOf(parentCoordinate, parentCoordinate.length);
-            for (int i = 0; i < scaledCoordinate.length; ++i) {
-                scaledCoordinate[i] /= samplingFactor;
-            }
-            ReferTo(output, scaledCoordinate, result);            
-            // System.out.println(pCoordEncoded + " is a corner and it's average value is " + result);
-        }
-    }
 }
